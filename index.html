@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Дурак 2025 - Подкидной и Переводной</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&display=swap');
+
+:root{
+    --bg1:#0f2027;
+    --bg2:#203a43;
+    --bg3:#2c5364;
+    --card:#f7f6f2;
+    --border:#2b2b2b;
+    --red:#c62828;
+    --shadow:rgba(0,0,0,.35);
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+
+body{
+    min-height:100vh;
+    background:linear-gradient(135deg,var(--bg1),var(--bg2),var(--bg3));
+    font-family:'Inter',sans-serif;
+    color:white;
+}
+
+.top{
+    display:flex;
+    justify-content:center;
+    gap:20px;
+    padding:20px;
+    flex-wrap:wrap;
+}
+
+.group{
+    display:flex;
+    gap:8px;
+}
+
+.group button{
+    padding:10px 18px;
+    border-radius:12px;
+    border:1px solid rgba(255,255,255,.2);
+    background:rgba(255,255,255,.08);
+    color:white;
+    cursor:pointer;
+    transition:.25s;
+}
+
+.group button.active{
+    background:rgba(255,255,255,.25);
+}
+
+.table{
+    padding:30px;
+    display:flex;
+    justify-content:center;
+}
+
+.battle{
+    display:flex;
+    gap:40px;
+    flex-wrap:wrap;
+    justify-content:center;
+}
+
+/* ===== CARD ===== */
+.card{
+    width:80px;
+    height:112px;
+    background:linear-gradient(145deg,#fff,#efece2);
+    border-radius:16px;
+    border:1.5px solid var(--border);
+    box-shadow:0 12px 24px var(--shadow);
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+    padding:6px 4px;
+    cursor:pointer;
+}
+
+.corner{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    line-height:1;
+}
+
+.bottom{transform:rotate(180deg)}
+
+.rank{font-size:.9rem;font-weight:700}
+.suit{font-size:1rem}
+.red{color:var(--red)}
+.black{color:#111}
+
+.center{
+    font-size:2.2rem;
+    opacity:.12;
+    text-align:center;
+}
+
+.pair{
+    position:relative;
+    width:80px;
+    height:112px;
+}
+
+.pair .card:last-child{
+    position:absolute;
+    top:14px;
+    left:14px;
+}
+
+.hand{
+    display:flex;
+    gap:10px;
+    justify-content:center;
+    padding:20px;
+    flex-wrap:wrap;
+}
+
+@media(max-width:768px){
+    .card{width:60px;height:84px}
+    .pair{width:60px;height:84px}
+    .pair .card:last-child{top:10px;left:10px}
+}
+</style>
+</head>
+<body>
+
+<div class="top">
+    <div class="group" id="mode">
+        <button data-mode="throw" class="active">Подкидной</button>
+        <button data-mode="transfer">Переводной</button>
+    </div>
+
+    <div class="group" id="difficulty">
+        <button data-diff="easy" class="active">Легко</button>
+        <button data-diff="medium">Средне</button>
+        <button data-diff="hard">Сложно</button>
+    </div>
+    
+    <button id="startBtn" style="padding:12px 24px;border-radius:12px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.25);color:white;cursor:pointer;font-size:1rem;font-weight:600;">Начать игру</button>
+</div>
+
+<div id="gameArea" style="display:none;">
+    <div class="table">
+        <div class="battle" id="battle"></div>
+    </div>
+
+    <div style="text-align:center;padding:20px;color:rgba(255,255,255,.7)">
+        <div style="display:flex;justify-content:center;align-items:center;gap:15px;flex-wrap:wrap">
+            <div>Колода: <span id="deckCount">36</span> карт</div>
+            <div id="deckVisual" style="cursor:pointer;" title="Колода"></div>
+            <div>Козырь: <span id="trump"></span></div>
+        </div>
+    </div>
+
+    <div style="padding:20px">
+        <div style="text-align:center;margin-bottom:10px;color:rgba(255,255,255,.8)">
+            Бот (<span id="botCount">6</span> карт)
+        </div>
+        <div class="hand" id="botHand"></div>
+    </div>
+
+    <div style="padding:20px">
+        <div style="text-align:center;margin-bottom:10px;color:rgba(255,255,255,.8)">
+            Вы (<span id="playerCount">6</span> карт)
+        </div>
+        <div class="hand" id="hand"></div>
+    </div>
+</div>
+
+<div style="text-align:center;padding:20px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+    <button id="passBtn" style="padding:12px 24px;border-radius:12px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.15);color:white;cursor:pointer;font-size:1rem;display:none;">Бито</button>
+    <button id="takeBtn" style="padding:12px 24px;border-radius:12px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.15);color:white;cursor:pointer;font-size:1rem;display:none;">Забрать</button>
+</div>
+
+<script>
+// ====== Настройки ======
+const suits=[
+    {s:'♠',c:'black'},
+    {s:'♥',c:'red'},
+    {s:'♣',c:'black'},
+    {s:'♦',c:'red'}
+];
+const ranks=['6','7','8','9','10','В','Д','К','Т'];
+
+let mode='throw';
+let difficulty='easy';
+let battle=[];
+let hand=[];
+let botHand=[];
+let deck=[];
+let trump=null;
+let isPlayerTurn=true;
+let isAttacking=true;
+let gameStarted=false;
+
+// ====== UI режимов и сложности ======
+document.querySelectorAll('#mode button').forEach(b=>{
+    b.onclick=()=>{setActive('#mode',b);mode=b.dataset.mode;}
+});
+document.querySelectorAll('#difficulty button').forEach(b=>{
+    b.onclick=()=>{setActive('#difficulty',b);difficulty=b.dataset.diff;}
+});
+function setActive(sel,btn){
+    document.querySelectorAll(sel+' button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+}
+
+// ====== Инициализация колоды ======
+function createDeck(){
+    const d=[];
+    for(const s of suits){
+        for(const r of ranks){
+            d.push({rank:r,suit:s.s,color:s.c});
+        }
+    }
+    return d.sort(()=>Math.random()-0.5);
+}
+
+function dealCards(){
+    // Раздаем по 6 карт игроку и боту
+    hand=[];
+    botHand=[];
+    for(let i=0;i<6;i++){
+        if(deck.length>0) hand.push(deck.shift());
+        if(deck.length>0) botHand.push(deck.shift());
+    }
+    updateDeckCount();
+    updateCounts();
+}
+
+function updateDeckCount(){
+    const deckCountEl=document.getElementById('deckCount');
+    if(deckCountEl) deckCountEl.textContent=deck.length;
+    renderDeck();
+}
+
+function updateCounts(){
+    const playerCountEl=document.getElementById('playerCount');
+    const botCountEl=document.getElementById('botCount');
+    if(playerCountEl) playerCountEl.textContent=hand.length;
+    if(botCountEl) botCountEl.textContent=botHand.length;
+}
+
+// Глобальные элементы
+let handEl,botHandEl,battleEl,passBtn,takeBtn,deckVisual;
+
+function startGame(){
+    if(gameStarted) return;
+    
+    gameStarted=true;
+    battle=[];
+    isPlayerTurn=true;
+    isAttacking=true;
+    
+    // Скрываем кнопку старта и показываем игру
+    document.getElementById('startBtn').style.display='none';
+    document.getElementById('gameArea').style.display='block';
+    
+    // Инициализация элементов
+    handEl=document.getElementById('hand');
+    botHandEl=document.getElementById('botHand');
+    battleEl=document.getElementById('battle');
+    deckVisual=document.getElementById('deckVisual');
+    
+    // Инициализируем кнопки
+    initButtons();
+    
+    // Создаем колоду
+    deck=createDeck();
+    trump=deck[deck.length-1];
+    const trumpEl=document.getElementById('trump');
+    if(trumpEl) trumpEl.innerHTML=`<span class="${trump.color}">${trump.rank}${trump.suit}</span>`;
+    
+    // Раздаем карты
+    dealCards();
+    
+    // Рендерим все
+    renderHand();
+    renderBotHand();
+    renderDeck();
+    renderBattle();
+}
+
+
+// ====== Функции рендеринга ======
+function renderHand(){
+    if(!handEl) return;
+    handEl.innerHTML='';
+    hand.forEach((c,i)=>{
+        const el=createCard(c);
+        if(isPlayerTurn && isAttacking){
+            // Режим атаки - можно атаковать или подкидывать
+            el.onclick=()=>playerMove(i);
+        } else if(isPlayerTurn && !isAttacking){
+            // Режим защиты - можно защищаться или подкидывать
+            const canDefendCard=battle.some(p=>!p.defend && canDefend(c,p.attack));
+            
+            // Проверяем, можно ли подкинуть карту
+            let canThrowCard=false;
+            if(battle.length>0 && battle.length<6){
+                if(mode==='throw'){
+                    // В подкидном режиме можно подкидывать карты того же ранга
+                    const ranksOnTable=[];
+                    battle.forEach(pp=>{
+                        if(pp.attack) ranksOnTable.push(pp.attack.rank);
+                        if(pp.defend) ranksOnTable.push(pp.defend.rank);
+                    });
+                    canThrowCard=ranksOnTable.includes(c.rank);
+                } else if(mode==='transfer'){
+                    // В переводном режиме можно подкидывать только до защиты
+                    if(!battle.some(p=>p.defend)){
+                        canThrowCard=battle.some(p=>p.attack.rank===c.rank);
+                    }
+                }
+            }
+            
+            if(canDefendCard){
+                el.onclick=()=>playerDefend(i);
+            } else if(canThrowCard){
+                el.onclick=()=>playerMove(i);
+            }
+        }
+        handEl.appendChild(el);
+    });
+}
+
+function renderBotHand(){
+    if(!botHandEl) return;
+    botHandEl.innerHTML='';
+    botHand.forEach(()=>{
+        const back=document.createElement('div');
+        back.className='card';
+        back.style.background='linear-gradient(145deg,#2c5364,#203a43)';
+        back.style.cursor='default';
+        botHandEl.appendChild(back);
+    });
+}
+
+function renderDeck(){
+    if(!deckVisual) return;
+    if(deck.length>0){
+        const deckCard=document.createElement('div');
+        deckCard.className='card';
+        deckCard.style.background='linear-gradient(145deg,#1a4a5a,#0f3a47)';
+        deckCard.style.cursor='default';
+        deckCard.style.position='relative';
+        deckCard.innerHTML=`<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:1.5rem;opacity:0.6;">${deck.length}</div>`;
+        deckVisual.innerHTML='';
+        deckVisual.appendChild(deckCard);
+    } else {
+        deckVisual.innerHTML='';
+    }
+}
+
+function renderBattle(){
+    if(!battleEl) return;
+    battleEl.innerHTML='';
+    battle.forEach(p=>{
+        const pair=document.createElement('div');
+        pair.className='pair';
+        pair.appendChild(createCard(p.attack));
+        if(p.defend) pair.appendChild(createCard(p.defend));
+        battleEl.appendChild(pair);
+    });
+    checkButtonsAfterMove();
+}
+
+function createCard(c){
+    const card=document.createElement('div');
+    card.className='card';
+    card.innerHTML=`
+        <div class="corner ${c.color}">
+            <div class="rank">${c.rank}</div>
+            <div class="suit">${c.suit}</div>
+        </div>
+        <div class="center ${c.color}">${c.suit}</div>
+        <div class="corner bottom ${c.color}">
+            <div class="rank">${c.rank}</div>
+            <div class="suit">${c.suit}</div>
+        </div>`;
+    return card;
+}
+
+// ====== Игровая логика ======
+function playerMove(index){
+    if(!isPlayerTurn) return;
+    if(battle.length>=6) return;
+    const card=hand[index];
+
+    // ПОДКИДНОЙ режим
+    if(mode==='throw'){
+        if(battle.length>0){
+            // Можно подкидывать карты того же ранга, что уже есть на столе (и атакующие, и защитные)
+            const ranksOnTable=[];
+            battle.forEach(p=>{
+                if(p.attack) ranksOnTable.push(p.attack.rank);
+                if(p.defend) ranksOnTable.push(p.defend.rank);
+            });
+            if(!ranksOnTable.includes(card.rank)) return;
+        }
+        addAttackCard(index,true);
+    }
+
+    // ПЕРЕВОДНОЙ режим
+    else if(mode==='transfer'){
+        if(battle.length===0) return;
+        // В переводном режиме можно подкидывать только до первой защиты
+        if(battle.some(p=>p.defend)) return;
+        if(!battle.some(p=>p.attack.rank===card.rank)) return;
+        addAttackCard(index,true);
+    }
+}
+
+function playerDefend(index){
+    if(!isPlayerTurn || isAttacking) return;
+    if(battle.length===0) return;
+    
+    // Находим первую незащищенную пару
+    let targetPair=null;
+    for(let i=0;i<battle.length;i++){
+        if(!battle[i].defend){
+            targetPair=battle[i];
+            break;
+        }
+    }
+    
+    if(!targetPair) return;
+    
+    const card=hand[index];
+    if(canDefend(card,targetPair.attack)){
+        targetPair.defend=card;
+        hand.splice(index,1);
+        renderBattle();
+        renderHand();
+        updateCounts();
+        
+        // Проверяем кнопки после защиты
+        checkButtonsAfterMove();
+    }
+}
+
+function canDefend(defendCard,attackCard){
+    const isTrumpDefend=defendCard.suit===trump.suit;
+    const isTrumpAttack=attackCard.suit===trump.suit;
+    
+    if(isTrumpDefend && !isTrumpAttack) return true;
+    if(!isTrumpDefend && isTrumpAttack) return false;
+    if(isTrumpDefend && isTrumpAttack){
+        return getCardValue(defendCard)>getCardValue(attackCard);
+    }
+    
+    if(defendCard.suit===attackCard.suit){
+        return getCardValue(defendCard)>getCardValue(attackCard);
+    }
+    return false;
+}
+
+function getCardValue(card){
+    const values={'6':6,'7':7,'8':8,'9':9,'10':10,'В':11,'Д':12,'К':13,'Т':14};
+    return values[card.rank]||0;
+}
+
+function addAttackCard(index,isPlayer){
+    const card=isPlayer?hand[index]:botHand[index];
+    battle.push({attack:card,defend:null});
+    if(isPlayer){
+        hand.splice(index,1);
+        renderHand();
+    } else {
+        botHand.splice(index,1);
+        renderBotHand();
+    }
+    renderBattle();
+    updateCounts();
+    
+    if(isPlayer){
+        // После первой атаки переходим в режим защиты
+        if(battle.length===1){
+            isAttacking=false;
+            checkButtonsAfterMove();
+            setTimeout(()=>botDefend(),500);
+        }
+        // Если уже есть защита, можно продолжать подкидывать
+        else if(battle.some(p=>p.defend)){
+            // Можно продолжать подкидывать карты - остаемся в режиме защиты
+            // Бот должен защищаться от новой карты
+            isAttacking=false;
+            checkButtonsAfterMove();
+            setTimeout(()=>botDefend(),500);
+        }
+        // Если нет защиты, бот должен защищаться
+        else {
+            isAttacking=false;
+            checkButtonsAfterMove();
+            setTimeout(()=>botDefend(),500);
+        }
+    }
+}
+
+
+function botTurn(){
+    if(botHand.length===0){
+        alert('Бот проиграл!');
+        return;
+    }
+    
+    // Бот атакует
+    if(isAttacking){
+        let attackCard=null;
+        let attackIndex=-1;
+        
+        if(battle.length===0){
+            // Первая атака - выбираем самую слабую карту
+            attackIndex=0;
+            for(let i=1;i<botHand.length;i++){
+                if(getCardValue(botHand[i])<getCardValue(botHand[attackIndex])){
+                    attackIndex=i;
+                }
+            }
+        } else {
+            // Подкидываем карту того же ранга
+            const ranksOnTable=[];
+            battle.forEach(p=>{
+                if(p.attack) ranksOnTable.push(p.attack.rank);
+                if(p.defend) ranksOnTable.push(p.defend.rank);
+            });
+            
+            for(let i=0;i<botHand.length;i++){
+                if(ranksOnTable.includes(botHand[i].rank)){
+                    attackIndex=i;
+                    break;
+                }
+            }
+        }
+        
+        if(attackIndex>=0 && battle.length<6){
+            addAttackCard(attackIndex,false);
+            isAttacking=false;
+            setTimeout(()=>botDefend(),500);
+        } else {
+            // Бот не может атаковать - передаем ход игроку
+            isAttacking=true;
+            isPlayerTurn=true;
+            passBtn.style.display='none';
+            takeBtn.style.display='none';
+        }
+    }
+}
+
+function botDefend(){
+    if(battle.length===0) return;
+    
+    // Находим первую незащищенную пару
+    let targetPair=null;
+    for(let i=0;i<battle.length;i++){
+        if(!battle[i].defend){
+            targetPair=battle[i];
+            break;
+        }
+    }
+    
+    if(!targetPair) {
+        // Все пары защищены
+        setTimeout(()=>{
+            clearBattle();
+            isAttacking=true;
+            isPlayerTurn=true;
+            passBtn.style.display='none';
+            takeBtn.style.display='none';
+            
+            // Добираем карты
+            while(hand.length<6 && deck.length>0) hand.push(deck.shift());
+            while(botHand.length<6 && deck.length>0) botHand.push(deck.shift());
+            updateDeckCount();
+            updateCounts();
+            renderHand();
+        },1000);
+        return;
+    }
+    
+    // Ищем карту для защиты
+    let defendIndex=-1;
+    let bestCard=null;
+    
+    for(let i=0;i<botHand.length;i++){
+        if(canDefend(botHand[i],targetPair.attack)){
+            if(!bestCard || getCardValue(botHand[i])<getCardValue(bestCard)){
+                bestCard=botHand[i];
+                defendIndex=i;
+            }
+        }
+    }
+    
+    if(defendIndex>=0){
+        targetPair.defend=botHand[defendIndex];
+        botHand.splice(defendIndex,1);
+        renderBattle();
+        renderBotHand();
+        updateCounts();
+        
+        // Если все пары защищены, ход переходит игроку
+        if(battle.every(p=>p.defend)){
+            setTimeout(()=>{
+                clearBattle();
+                isAttacking=true;
+                isPlayerTurn=true;
+                passBtn.style.display='none';
+                takeBtn.style.display='none';
+                
+                // Добираем карты
+                while(hand.length<6 && deck.length>0) hand.push(deck.shift());
+                while(botHand.length<6 && deck.length>0) botHand.push(deck.shift());
+                updateDeckCount();
+                updateCounts();
+                renderHand();
+            },1000);
+        } else {
+            // Бот продолжает защищаться
+            setTimeout(()=>botDefend(),500);
+        }
+    } else {
+        // Бот не может защититься - берет карты
+        setTimeout(()=>{
+            botHand.push(...battle.map(p=>p.attack));
+            battle.forEach(p=>{
+                if(p.defend) botHand.push(p.defend);
+            });
+            clearBattle();
+            renderBotHand();
+            updateCounts();
+            
+            // Добираем карты
+            while(hand.length<6 && deck.length>0) hand.push(deck.shift());
+            while(botHand.length<6 && deck.length>0) botHand.push(deck.shift());
+            updateDeckCount();
+            updateCounts();
+            renderHand();
+            
+            isAttacking=true;
+            isPlayerTurn=true;
+            passBtn.style.display='none';
+            takeBtn.style.display='none';
+        },1000);
+    }
+}
+
+function clearBattle(){
+    battle=[];
+    renderBattle();
+}
+
+function checkButtonsAfterMove(){
+    // Показываем кнопки после каждого хода
+    if(isPlayerTurn && battle.length>0){
+        // "Бито" - показываем если:
+        // 1. Все пары защищены (когда игрок защищается)
+        // 2. Игрок атакует и подкинул карты (можно завершить раунд)
+        const allDefended=battle.every(p=>p.defend);
+        const canPass=(!isAttacking && allDefended) || (isAttacking && battle.length>0);
+        
+        // "Забрать" - показываем только когда игрок защищается и есть незащищенные карты
+        const canTake=!isAttacking && battle.some(p=>!p.defend);
+        
+        if(passBtn){
+            if(canPass){
+                passBtn.style.display='block';
+            } else {
+                passBtn.style.display='none';
+            }
+        }
+        
+        if(takeBtn){
+            if(canTake){
+                takeBtn.style.display='block';
+            } else {
+                takeBtn.style.display='none';
+            }
+        }
+    } else {
+        if(passBtn) passBtn.style.display='none';
+        if(takeBtn) takeBtn.style.display='none';
+    }
+}
+
+function checkPassButton(){
+    if(!passBtn) return;
+    // Показываем "Бито" когда все пары защищены или можно завершить раунд
+    if(isPlayerTurn && battle.length>0){
+        const allDefended=battle.every(p=>p.defend);
+        const canPass=allDefended || (isAttacking && battle.length>0);
+        if(canPass){
+            passBtn.style.display='block';
+        } else {
+            passBtn.style.display='none';
+        }
+    } else {
+        passBtn.style.display='none';
+    }
+}
+
+function checkTakeButton(){
+    if(!takeBtn) return;
+    // Показываем "Забрать" когда игрок защищается и есть незащищенные карты
+    if(isPlayerTurn && !isAttacking && battle.length>0 && battle.some(p=>!p.defend)){
+        takeBtn.style.display='block';
+    } else {
+        takeBtn.style.display='none';
+    }
+}
+
+function takeCards(){
+    // Игрок забирает все карты со стола
+    hand.push(...battle.map(p=>p.attack));
+    battle.forEach(p=>{
+        if(p.defend) hand.push(p.defend);
+    });
+    clearBattle();
+    renderHand();
+    updateCounts();
+    
+    // Добираем карты
+    while(hand.length<6 && deck.length>0) hand.push(deck.shift());
+    while(botHand.length<6 && deck.length>0) botHand.push(deck.shift());
+    updateDeckCount();
+    updateCounts();
+    
+    isAttacking=true;
+    isPlayerTurn=false;
+    takeBtn.style.display='none';
+    passBtn.style.display='none';
+    
+    setTimeout(()=>botTurn(),500);
+}
+
+// Инициализация обработчиков кнопок
+function initButtons(){
+    passBtn=document.getElementById('passBtn');
+    takeBtn=document.getElementById('takeBtn');
+    
+    if(passBtn) {
+        passBtn.onclick=()=>{
+            if(!isPlayerTurn || battle.length===0) return;
+            
+            // Если игрок атакует - завершаем раунд, передаем ход боту для защиты
+            if(isAttacking){
+                isAttacking=false;
+                isPlayerTurn=false;
+                passBtn.style.display='none';
+                takeBtn.style.display='none';
+                setTimeout(()=>botDefend(),500);
+                return;
+            }
+            
+            // Если игрок защищается - все пары должны быть защищены
+            if(!battle.every(p=>p.defend)) return;
+            
+            clearBattle();
+            isAttacking=true;
+            isPlayerTurn=false;
+            passBtn.style.display='none';
+            takeBtn.style.display='none';
+            
+            // Добираем карты
+            while(hand.length<6 && deck.length>0) hand.push(deck.shift());
+            while(botHand.length<6 && deck.length>0) botHand.push(deck.shift());
+            updateDeckCount();
+            updateCounts();
+            renderHand();
+            
+            setTimeout(()=>botTurn(),500);
+        };
+    }
+    
+    if(takeBtn) {
+        takeBtn.onclick=()=>{
+            takeCards();
+        };
+    }
+}
+
+// Кнопка старта инициализируется при загрузке
+const startBtnEl=document.getElementById('startBtn');
+if(startBtnEl) {
+    startBtnEl.onclick=startGame;
+}
+</script>
+
+</body>
+</html>
